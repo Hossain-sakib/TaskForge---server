@@ -23,7 +23,7 @@ async function run() {
   try {
     await client.connect();
     const userCollection = client.db("tfDB").collection("users");
-    const taskCollection = client.db("tfDB").collection("tasks");
+    const taskCollection = client.db("tfDB").collection("myTodos");
 
 
     // user
@@ -45,22 +45,23 @@ async function run() {
 
     
     // task 
-    app.post("/addtask", async (req, res) => {
-      const task = req.body;
-      const result = await taskCollection.insertOne(task);
+    app.post("/todos", async(req,res)=>{
+      const todo = req.body;
+      const result = await todosCollection.insertOne(todo);
       res.send(result);
-    });
-    app.get('/addtask', async (req, res) => {
-      console.log(req.query.email);
-      let query={}
-      if (req.query?.email){
-        query={email: req.query.email}
+    })
+    app.get("/todos", async(req,res)=>{
+      const request = req.query;
+      let query = {};
+      if(request.email){
+        query = {
+          user: request.email
+        }
       }
-      const result = await AddTaskCollection.find(query).toArray();
+      const result = await todosCollection.find(query).toArray();
       res.send(result);
-  })
+    })
 
-  
 
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
