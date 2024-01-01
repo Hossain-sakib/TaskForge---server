@@ -1,112 +1,93 @@
-// server.js
 const express = require("express");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const { MongoClient, ObjectId } = require("mongodb");
-require("dotenv").config();
-
 const app = express();
 const port = process.env.PORT || 5000;
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fyhidjj.mongodb.net/tfDB?retryWrites=true&w=majority`;
+const cors = require("cors");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+require("dotenv").config();
 
 app.use(cors());
 app.use(express.json());
 
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.fyhidjj.mongodb.net/tfDB?retryWrites=true&w=majority`;
+
 const client = new MongoClient(uri, {
-    serverApi: {
-        version: "1",
-        strict: true,
-        deprecationErrors: true,
-    },
+  serverApi: {
+    version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
+  },
 });
 
 async function run() {
-    try {
-        await client.connect();
-        const todosCollection = client.db("tfDB").collection("myTodos");
+  try {
+    // await client.connect();
+    const userCollection = client.db("tfDB").collection("users");
+    const todosCollection = client.db("tfDB").collection("myTodos");
 
-        app.post("/todos", async (req, res) => {
-            try {
-                const todo = req.body;
-                const result = await todosCollection.insertOne(todo);
-                res.send(result);
-            } catch (error) {
-                console.error("Error:", error);
-                res.status(500).send({ error: "An error occurred." });
-            }
-        });
+    // Create user
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await userCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exist", insertedId: null });
+      }
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+    app.get("/users", async (req, res) => {
+      const result = await userCollection.find().toArray();
+      res.send(result);
+    });
+    
+    // Create a new todo
+    app.post("/todos", async (req, res) => {
+      const todo = req.body;
+      const result = await todosCollection.insertOne(todo);
+      res.send(result);
+    });
 
-        app.get("/todos", async (req, res) => {
-            try {
-                const request = req.query;
-                let query = {};
-                if (request.email) {
-                    query = { user: request.email };
-                }
-                const result = await todosCollection.find(query).toArray();
-                res.send(result);
-            } catch (error) {
-                console.error("Error:", error);
-                res.status(500).send({ error: "An error occurred." });
-            }
-        });
+    // Get todos based on user's email
+    app.get("/todos", async (req, res) => {
+      const request = req.query;
+      let query = {};
+      if (request.email) {
+        query = { user: request.email };
+      }
+      const result = await todosCollection.find(query).toArray();
+      res.send(result);
+    });
 
-        app.delete("/todos/:id", async (req, res) => {
-            try {
-                const id = req.params.id;
-                const query = { _id: new ObjectId(id) };
-                const result = await todosCollection.deleteOne(query);
-                res.send(result);
-            } catch (error) {
-                console.error("Error:", error);
-                res.status(500).send({ error: "An error occurred." });
-            }
-        });
+    // Delete a todo by ID
+    app.delete("/todos/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await todosCollection.deleteOne(query);
+      res.send(result);
+    });
 
-        app.patch("/todos/:id", async (req, res) => {
-            try {
-                const id = req.params.id;
-                const { status } = req.body; // Extract status from request body
+    // Update the status of a todo by ID
+    app.patch("/todos/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const query = { _id: new ObjectId(id) };
+      const update = { $set: { status: status } };
+      const result = await todosCollection.updateOne(query, update);
+      res.send(result);
+    });
 
-                let updatedDoc;
-
-                if (status === "ongoing" || status === "completed") {
-                    updatedDoc = {
-                        $set: {
-                            status: status,
-                        },
-                    };
-
-                    const query = { _id: new ObjectId(id) };
-                    const result = await todosCollection.updateOne(query, updatedDoc);
-
-                    if (result.modifiedCount === 1) {
-                        res.send({ success: true });
-                    } else {
-                        res.status(404).send({ error: "Task not found." });
-                    }
-                } else {
-                    res.status(400).send({ error: "Invalid status provided." });
-                }
-            } catch (error) {
-                console.error("Error:", error);
-                res.status(500).send({ error: "An error occurred." });
-            }
-        });
-
-        console.log("Connected to MongoDB!");
-    } finally {
-        // Uncommenting this line as it may close the connection immediately
-        // await client.close();
-    }
+    console.log("Connected to MongoDB!");
+  } finally {
+    // 
+  }
 }
 
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-    res.send("Server is running");
+  res.send("Server is running");
 });
 
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
